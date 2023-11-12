@@ -65,7 +65,7 @@ location pin from the coverage maps.""",
     server.add_argument('--server',
                         help="host:port of the multilateration server to connect to",
                         type=options.hostport,
-                        default=('feed.adsbexchange.com', 31090))
+                        default=('feed.planespotters.net', 31090))
     server.add_argument('--no-udp',
                         dest='udp',
                         help="Don't offer to use UDP transport for sync/mlat messages",
