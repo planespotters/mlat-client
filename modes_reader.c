@@ -18,6 +18,7 @@
 
 #include "_modes.h"
 #include <stdlib.h>
+#include <Python.h>
 #include <sys/time.h>
 
 static unsigned long long monotic_ms(void) {
@@ -532,15 +533,15 @@ static PyObject *radarcape_position_to_dict(uint8_t *data)
 {
     float lat, lon, alt;
 
-    lat = _PyFloat_Unpack4(data + 4, 1);
+    lat = PyFloat_Unpack4(data + 4, 1);
     if (lat == -1.0 && PyErr_Occurred())
         return NULL;
 
-    lon = _PyFloat_Unpack4(data + 8, 1);
+    lon = PyFloat_Unpack4(data + 8, 1);
     if (lon == -1.0 && PyErr_Occurred())
         return NULL;
 
-    alt = _PyFloat_Unpack4(data + 12, 1);
+    alt = PyFloat_Unpack4(data + 12, 1);
     if (alt == -1.0 && PyErr_Occurred())
         return NULL;
 
