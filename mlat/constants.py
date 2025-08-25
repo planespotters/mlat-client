@@ -40,3 +40,10 @@ MS_TO_KTS = 1.9438
 
 # m/s to fpm
 MS_TO_FPM = MTOF * 60
+
+# Time-related constants
+SECONDS_PER_MINUTE = 60
+MILLISECONDS_PER_SECOND = 1000
+
+# Warning interval in seconds
+TIMESTAMP_WARNING_INTERVAL = 300

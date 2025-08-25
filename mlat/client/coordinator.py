@@ -27,6 +27,7 @@ import _modes
 import mlat.profile
 from mlat.client.util import monotonic_time, log
 from mlat.client.stats import global_stats
+from mlat.constants import TIMESTAMP_WARNING_INTERVAL
 
 import random
 random.seed()
@@ -52,10 +53,13 @@ class Aircraft:
 
 class Coordinator:
     update_interval = 4.5
-    report_interval = 4.0 # in multiples update_interval
+    report_interval = 4.0  # in multiples update_interval
     stats_interval = 900.0
     position_expiry_age = 30.0
     expiry_age = 120.0
+    
+    # Message count threshold for MLAT processing
+    MIN_MESSAGE_COUNT = 10
 
     def __init__(self, receiver, server, outputs, freq, allow_anon, allow_modeac):
         self.receiver = receiver
@@ -218,7 +222,6 @@ class Coordinator:
         global_stats.log_and_reset(self)
 
         adsb_req = adsb_total = modes_req = modes_total = 0
-        now = monotonic_time()
         for ac in self.aircraft.values():
             if ac.messages < 2:
                 continue
@@ -274,7 +277,9 @@ class Coordinator:
             o.send_position(timestamp, addr, lat, lon, alt, nsvel, ewvel, vrate,
                             callsign, squawk, error_est, nstations, anon, modeac)
 
-    def server_start_sending(self, icao_set, modeac_set=set()):
+    def server_start_sending(self, icao_set, modeac_set=None):
+        if modeac_set is None:
+            modeac_set = set()
         for icao in icao_set:
             ac = self.aircraft.get(icao)
             if ac:
@@ -284,7 +289,9 @@ class Coordinator:
             self.requested_modeac.update(modeac_set)
         self.update_receiver_filter()
 
-    def server_stop_sending(self, icao_set, modeac_set=set()):
+    def server_stop_sending(self, icao_set, modeac_set=None):
+        if modeac_set is None:
+            modeac_set = set()
         for icao in icao_set:
             ac = self.aircraft.get(icao)
             if ac:
@@ -306,6 +313,16 @@ class Coordinator:
 
         self.receiver.update_filter(mlat)
         self.receiver.update_modeac_filter(self.requested_modeac)
+
+    def _create_aircraft(self, icao, now):
+        """Create a new Aircraft instance with common initialization."""
+        ac = Aircraft(icao)
+        ac.requested = (icao in self.requested_traffic)
+        ac.messages = 1
+        ac.last_message_time = now
+        ac.rate_measurement_start = now
+        self.aircraft[icao] = ac
+        return ac
 
     # callbacks from receiver input
 
@@ -349,8 +366,8 @@ class Coordinator:
         self.recent_jumps += 1
         self.server.send_clock_jump()
         #log("clockjump")
-        if self.recent_jumps % 9 == 8 and time.monotonic() > self.last_jump_message + 300.0 :
-            self.last_jump_message = time.monotonic()
+        if self.recent_jumps % 9 == 8 and monotonic_time() > self.last_jump_message + TIMESTAMP_WARNING_INTERVAL:
+            self.last_jump_message = monotonic_time()
             log("WARNING: the timestamps provided by your receiver do not seem to be self-consistent. "
                 "This can happen if you feed data from multiple receivers to a single mlat-client, which "
                 "is not supported; use a separate mlat-client for each receiver. "
@@ -358,7 +375,7 @@ class Coordinator:
 
     def received_radarcape_position_event(self, message, now):
         lat, lon = message.eventdata['lat'], message.eventdata['lon']
-        if lat >= -90 and lat <= 90 and lon >= -180 and lon <= -180:
+        if lat >= -90 and lat <= 90 and lon >= -180 and lon <= 180:
             self.server.send_position_update(lat, lon,
                                              message.eventdata['lon'],
                                              message.eventdata['alt'],
@@ -372,7 +389,7 @@ class Coordinator:
         ac.messages += 1
         ac.last_message_time = now
 
-        if ac.messages < 10:
+        if ac.messages < self.MIN_MESSAGE_COUNT:
             return   # wait for more messages
         if not ac.requested:
             return
@@ -385,18 +402,13 @@ class Coordinator:
     def received_df11(self, message, now):
         ac = self.aircraft.get(message.address)
         if not ac:
-            ac = Aircraft(message.address)
-            ac.requested = (message.address in self.requested_traffic)
-            ac.messages += 1
-            ac.last_message_time = now
-            ac.rate_measurement_start = now
-            self.aircraft[message.address] = ac
+            ac = self._create_aircraft(message.address, now)
             return   # will need some more messages..
 
         ac.messages += 1
         ac.last_message_time = now
 
-        if ac.messages < 10:
+        if ac.messages < self.MIN_MESSAGE_COUNT:
             return   # wait for more messages
         if not ac.requested:
             return
@@ -409,17 +421,12 @@ class Coordinator:
     def received_df17(self, message, now):
         ac = self.aircraft.get(message.address)
         if not ac:
-            ac = Aircraft(message.address)
-            ac.requested = (message.address in self.requested_traffic)
-            ac.messages += 1
-            ac.last_message_time = now
-            ac.rate_measurement_start = now
-            self.aircraft[message.address] = ac
+            ac = self._create_aircraft(message.address, now)
             return   # wait for more messages
 
         ac.messages += 1
         ac.last_message_time = now
-        if ac.messages < 10:
+        if ac.messages < self.MIN_MESSAGE_COUNT:
             return
 
         if not message.even_cpr and not message.odd_cpr:

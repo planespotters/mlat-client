@@ -50,20 +50,20 @@ class Stats:
         coordinator.print_server_statistics = True
 
         processed = self.receiver_rx_messages - self.receiver_rx_filtered
-        log('Receiver: {3:10s} {0:6.1f} msg/s received     {1:6.1f} msg/s processed ({2:.0f}%)',
-            self.receiver_rx_messages / elapsed,
-            processed / elapsed,
-            0 if self.receiver_rx_messages == 0 else 100.0 * processed / self.receiver_rx_messages,
-            coordinator.receiver.state)
+        log('Receiver: {state:10s} {received:6.1f} msg/s received     {processed:6.1f} msg/s processed ({percent:.0f}%)',
+            state=coordinator.receiver.state,
+            received=self.receiver_rx_messages / elapsed,
+            processed=processed / elapsed,
+            percent=0 if self.receiver_rx_messages == 0 else 100.0 * processed / self.receiver_rx_messages)
         if self.receiver_rx_mlat:
-            log('WARNING: Ignored {0:5d} messages with MLAT magic timestamp (do you have --forward-mlat on?)',
-                self.receiver_rx_mlat)
-        log('Server:   {0:10s} {1:6.1f} kB/s from server   {2:6.1f} kB/s to server',
-            coordinator.server.state,
-            self.server_rx_bytes / elapsed / 1000.0,
-            (self.server_tx_bytes + self.server_udp_bytes) / elapsed / 1000.0)
-        log('Results:  {0:3.1f} positions/minute',
-            self.mlat_positions / elapsed * 60.0)
+            log('WARNING: Ignored {count:5d} messages with MLAT magic timestamp (do you have --forward-mlat on?)',
+                count=self.receiver_rx_mlat)
+        log('Server:   {state:10s} {rx:6.1f} kB/s from server   {tx:6.1f} kB/s to server',
+            state=coordinator.server.state,
+            rx=self.server_rx_bytes / elapsed / 1000.0,
+            tx=(self.server_tx_bytes + self.server_udp_bytes) / elapsed / 1000.0)
+        log('Results:  {rate:3.1f} positions/minute',
+            rate=self.mlat_positions / elapsed * 60.0)
         self.reset(now)
 
 
