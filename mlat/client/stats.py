@@ -55,6 +55,15 @@ class Stats:
             received=self.receiver_rx_messages / elapsed,
             processed=processed / elapsed,
             percent=0 if self.receiver_rx_messages == 0 else 100.0 * processed / self.receiver_rx_messages)
+
+        from mlat.client.util import STATE_CONNECTED, STATE_READY
+        if coordinator.receiver.state not in (STATE_CONNECTED, STATE_READY):
+            log('         Check that your receiver at {host}:{port} is running and accessible',
+                host=coordinator.receiver.host, port=coordinator.receiver.port)
+        elif self.receiver_rx_messages == 0:
+            log('         Receiver is connected but not receiving any data')
+            log('         Check that your receiver is configured to output Beast format data')
+
         if self.receiver_rx_mlat:
             log('WARNING: Ignored {count:5d} messages with MLAT magic timestamp (do you have --forward-mlat on?)',
                 count=self.receiver_rx_mlat)

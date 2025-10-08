@@ -32,11 +32,13 @@ from mlat.client.util import log, monotonic_time, STATE_CONNECTED
 
 class ReceiverConnection(ReconnectingConnection):
     inactivity_timeout = 150.0
+    inactivity_warning_threshold = 30.0
 
     def __init__(self, host, port, mode):
         ReconnectingConnection.__init__(self, host, port)
         self.coordinator = None
         self.last_data_received = None
+        self.inactivity_warning_issued = False
         self.mode = mode
 
         # set up filters
@@ -107,6 +109,7 @@ class ReceiverConnection(ReconnectingConnection):
     def start_connection(self):
         log('Input connected to {0}:{1}', self.host, self.port)
         self.last_data_received = monotonic_time()
+        self.inactivity_warning_issued = False
         self.state = STATE_CONNECTED
         self.coordinator.input_connected()
 
@@ -139,10 +142,17 @@ class ReceiverConnection(ReconnectingConnection):
     def heartbeat(self, now):
         ReconnectingConnection.heartbeat(self, now)
 
-        if self.state == STATE_CONNECTED and (now - self.last_data_received) > self.inactivity_timeout:
-            self.disconnect('No data (not even keepalives) received for {0:.0f} seconds'.format(
-                self.inactivity_timeout))
-            self.reconnect()
+        if self.state == STATE_CONNECTED:
+            inactivity_duration = now - self.last_data_received
+
+            if inactivity_duration > self.inactivity_timeout:
+                self.disconnect('No data (not even keepalives) received for {0:.0f} seconds'.format(
+                    self.inactivity_timeout))
+                self.reconnect()
+            elif inactivity_duration > self.inactivity_warning_threshold and not self.inactivity_warning_issued:
+                log('WARNING: No data received from receiver for {0:.0f} seconds', inactivity_duration)
+                log('WARNING: Check that your receiver is running and sending data')
+                self.inactivity_warning_issued = True
 
     def recent_aircraft(self):
         """Return the set of aircraft seen from the receiver since the

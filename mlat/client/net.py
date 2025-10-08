@@ -101,6 +101,7 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
         if self.state != STATE_DISCONNECTED:
             if not manual_close:
                 log('Lost connection to {host}:{port}', host=self.host, port=self.port)
+                log('This may indicate the remote service is unavailable or network connectivity issues')
 
             self.state = STATE_DISCONNECTED
             self.reset_connection()
@@ -181,6 +182,7 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
             except socket.error as e:
                 # EADDRNOTAVAIL (99) = address family not available (e.g. no IPv6)
                 # ENETUNREACH (101) = network unreachable (e.g. IPv6 not routed)
+                # ECONNREFUSED (111) = connection refused (service not running)
                 # Try the next address if available
                 if e.errno in (99, 101) and len(self.addrlist) > 0:
                     log('Connection failed ({error}), trying next address', error=e.strerror)
@@ -188,6 +190,13 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
 
                 # For other errors or if no more addresses, give up and schedule reconnect
                 log('Connection to {host}:{port} failed: {ex!s}', host=self.host, port=self.port, ex=e)
+                if e.errno == 111:  # ECONNREFUSED
+                    log('Connection refused - check that the service at {host}:{port} is running',
+                        host=self.host, port=self.port)
+                elif e.errno == 113:  # EHOSTUNREACH
+                    log('Host unreachable - check network connectivity and host address')
+                elif e.errno == 110:  # ETIMEDOUT
+                    log('Connection timeout - check firewall settings and network connectivity')
                 self.close()
                 break
 

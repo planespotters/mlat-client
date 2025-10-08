@@ -34,6 +34,57 @@ To run it, invoke:
 To connect to a multilateration server, contact the server's administrator
 for configuration instructions.
 
+### Prerequisites
+
+**IMPORTANT**: Before starting the mlat-client, ensure your ADS-B receiver/data source is running and accessible. The client requires an active connection to your receiver to function properly.
+
+**Common receiver sources:**
+- dump1090 / dump1090-fa / dump1090-mutability (typically on port 30005)
+- readsb (typically on port 30005)
+- Radarcape
+- Mode-S Beast
+
+**Verify receiver is running:**
+```bash
+# Check if your receiver is listening on the expected port
+# (Replace 30005 with your actual port)
+nc -zv localhost 30005
+```
+
+If this fails, start your receiver software before running mlat-client.
+
+### Troubleshooting
+
+#### Receiver connection issues
+
+**Symptom**: Client logs "Receiver not connected" or "No data received for X seconds"
+
+**Common causes:**
+1. **Receiver not running** - Start your receiver software (dump1090, readsb, etc.)
+2. **Wrong host/port** - Verify `--input-connect` matches your receiver's output port (usually localhost:30005)
+3. **Firewall blocking connection** - Check firewall rules allow local connections
+4. **Receiver output not configured** - Ensure receiver is configured to output Beast format data
+
+**Check receiver status:**
+```bash
+# For dump1090-fa/readsb as a service
+sudo systemctl status dump1090-fa
+# or
+sudo systemctl status readsb
+
+# Check if receiver is outputting data
+nc localhost 30005 | hexdump -C
+# You should see data flowing. Press Ctrl+C to exit.
+```
+
+#### Data quality issues
+
+**Symptom**: "Out-of-order timestamps" warnings
+
+**Common causes:**
+1. **Multiple receivers feeding one client** - Use separate mlat-client for each receiver
+2. **Wrong input type** - Verify `--input-type` matches your receiver (try `radarcape_gps` or `dump1090`)
+
 ## Supported receivers
 
 * Anything that produces Beast-format output with a 12MHz clock:

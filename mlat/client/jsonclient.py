@@ -179,6 +179,7 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
     reconnect_interval = 10.0
     heartbeat_interval = 120.0
     inactivity_timeout = 60.0
+    data_flow_check_interval = 10.0
 
     def __init__(self, host, port, uuid_path, handshake_data, offer_zlib, offer_udp, return_results):
         super().__init__(host, port)
@@ -196,6 +197,8 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         self.coordinator = None
         self.udp_transport = None
         self.last_clock_reset = time.monotonic()
+        self.data_flow_check_at = None
+        self.data_flow_warning_issued = False
 
         self.reset_connection()
 
@@ -210,6 +213,8 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         self.handle_server_line = None
         self.server_heartbeat_at = None
         self.last_data_received = None
+        self.data_flow_check_at = None
+        self.data_flow_warning_issued = False
 
         if self.udp_transport:
             self.udp_transport.close()
@@ -344,6 +349,12 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         self.state = STATE_HANDSHAKING
         self.last_data_received = monotonic_time()
 
+        from mlat.client.util import STATE_CONNECTED, STATE_READY, STATE_DISCONNECTED
+        if self.coordinator and self.coordinator.receiver:
+            receiver_state_name = {STATE_DISCONNECTED: 'disconnected', STATE_CONNECTED: 'connected', STATE_READY: 'ready'}.get(
+                self.coordinator.receiver.state, 'unknown')
+            log('Receiver state at handshake: {state}', state=receiver_state_name)
+
         compress_methods = ['none']
         if self.offer_zlib:
             compress_methods.append('zlib')
@@ -395,6 +406,22 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         if self.server_heartbeat_at is not None and self.server_heartbeat_at < now:
             self.server_heartbeat_at = now + self.heartbeat_interval
             self._send_json({'heartbeat': {'client_time': round(time.time(), 3)}})
+
+        if self.data_flow_check_at is not None and now >= self.data_flow_check_at and not self.data_flow_warning_issued:
+            from mlat.client.util import STATE_CONNECTED, STATE_READY
+            if self.coordinator.receiver.state not in (STATE_CONNECTED, STATE_READY):
+                log('WARNING: Server connection established, but receiver is not connected')
+                log('WARNING: Server will disconnect due to lack of data if receiver does not connect soon')
+                log('WARNING: Check that your receiver at {host}:{port} is running and accessible',
+                    host=self.coordinator.receiver.host, port=self.coordinator.receiver.port)
+                self.data_flow_warning_issued = True
+            elif global_stats.receiver_rx_messages == 0:
+                log('WARNING: Receiver is connected but has not received any messages')
+                log('WARNING: Check that your receiver is configured to output data')
+                log('WARNING: Server will disconnect due to lack of data if no messages are received')
+                self.data_flow_warning_issued = True
+            else:
+                self.data_flow_check_at = None
 
     def handle_read(self):
         try:
@@ -514,6 +541,9 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         self.state = STATE_READY
         self.handle_server_line = self.handle_connected_request
         self.coordinator.server_connected()
+
+        # Schedule a check to verify receiver data is flowing
+        self.data_flow_check_at = monotonic_time() + self.data_flow_check_interval
 
         # dummy rate report to indicate we'll be sending them
         self.send_rate_report({})

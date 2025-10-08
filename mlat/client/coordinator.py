@@ -258,7 +258,10 @@ class Coordinator:
         self.reported = set()
         self.next_report = random.random() * self.report_interval
         if self.receiver.state not in (STATE_CONNECTED, STATE_READY):
-            log('Receiver not connected (state: {0}), attempting to connect to receiver', self.receiver.state)
+            log('WARNING: Receiver not connected (state: {0})', self.receiver.state)
+            log('WARNING: Attempting to connect to receiver at {host}:{port}',
+                host=self.receiver.host, port=self.receiver.port)
+            log('WARNING: If this fails, check that your receiver (dump1090/readsb/etc.) is running')
             self.receiver.reconnect()
         else:
             log('Receiver already connected (state: {0})', self.receiver.state)
