@@ -149,6 +149,11 @@ location pin from the coverage maps.""",
     # Check receiver availability before starting
     check_receiver_availability(args.input_connect[0], args.input_connect[1])
 
+    # Start receiver connection first to give it time to establish before server handshake
+    util.log('Connecting to receiver at {host}:{port}', host=args.input_connect[0], port=args.input_connect[1])
+    receiver.reconnect()
+
+    # Start server connection
     server.start()
     try:
         coordinator.run_forever()
