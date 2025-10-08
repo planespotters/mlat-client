@@ -182,7 +182,13 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
 
     def __init__(self, host, port, uuid_path, handshake_data, offer_zlib, offer_udp, return_results):
         super().__init__(host, port)
-        self.uuid_path = uuid_path
+        # Ensure uuid_path is always a list (convert string to list if needed)
+        if uuid_path is None:
+            self.uuid_path = None
+        elif isinstance(uuid_path, str):
+            self.uuid_path = [uuid_path]
+        else:
+            self.uuid_path = uuid_path
         self.handshake_data = handshake_data
         self.offer_zlib = offer_zlib
         self.offer_udp = offer_udp
