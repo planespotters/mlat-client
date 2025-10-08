@@ -34,7 +34,7 @@ import mlat.profile
 import mlat.geodesy
 
 from mlat.client.util import (log, monotonic_time,
-                               STATE_HANDSHAKING, STATE_READY)
+                               STATE_HANDSHAKING, STATE_READY, STATE_CONNECTED, STATE_DISCONNECTED)
 from mlat.client.stats import global_stats
 
 DEBUG = False
@@ -349,7 +349,6 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         self.state = STATE_HANDSHAKING
         self.last_data_received = monotonic_time()
 
-        from mlat.client.util import STATE_CONNECTED, STATE_READY, STATE_DISCONNECTED
         if self.coordinator and self.coordinator.receiver:
             receiver_state_name = {STATE_DISCONNECTED: 'disconnected', STATE_CONNECTED: 'connected', STATE_READY: 'ready'}.get(
                 self.coordinator.receiver.state, 'unknown')
@@ -408,7 +407,6 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
             self._send_json({'heartbeat': {'client_time': round(time.time(), 3)}})
 
         if self.data_flow_check_at is not None and now >= self.data_flow_check_at and not self.data_flow_warning_issued:
-            from mlat.client.util import STATE_CONNECTED, STATE_READY
             if self.coordinator.receiver.state not in (STATE_CONNECTED, STATE_READY):
                 log('WARNING: Server connection established, but receiver is not connected')
                 log('WARNING: Server will disconnect due to lack of data if receiver does not connect soon')
