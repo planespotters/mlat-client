@@ -116,7 +116,20 @@ location pin from the coverage maps.""",
                               allow_anon=args.allow_anon_results, allow_modeac=args.allow_modeac_results)
 
     server.start()
-    coordinator.run_forever()
+    try:
+        coordinator.run_forever()
+    except KeyboardInterrupt:
+        util.log('Keyboard interrupt, shutting down')
+    except Exception as e:
+        util.log('Unexpected exception: {0}', e)
+        raise
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise SystemExit(1)

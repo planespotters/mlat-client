@@ -33,7 +33,8 @@ import mlat.client.net
 import mlat.profile
 import mlat.geodesy
 
-from mlat.client.util import log, monotonic_time
+from mlat.client.util import (log, monotonic_time,
+                               STATE_HANDSHAKING, STATE_READY)
 from mlat.client.stats import global_stats
 
 DEBUG = False
@@ -334,7 +335,7 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
 
     def start_connection(self):
         log('Connected to multilateration server at {0}:{1}, handshaking', self.host, self.port)
-        self.state = 'handshaking'
+        self.state = STATE_HANDSHAKING
         self.last_data_received = monotonic_time()
 
         compress_methods = ['none']
@@ -343,13 +344,18 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
             compress_methods.append('zlib2')
 
         uuid = None
-        for path in self.uuid_path:
-            try:
-                with open(path) as file:
-                    uuid = file.readline().rstrip('\n')
-                break
-            except Exception:
-                pass
+        if self.uuid_path:
+            for path in self.uuid_path:
+                try:
+                    with open(path) as file:
+                        uuid = file.readline().rstrip('\n')
+                    log('Read UUID from {0}', path)
+                    break
+                except Exception as e:
+                    log('Could not read UUID from {0}: {1}', path, e)
+
+            if uuid is None:
+                log('Warning: Could not read UUID from any of the specified paths')
 
         handshake_msg = {'version': 3,
                          'client_version': mlat.client.version.CLIENT_VERSION,
@@ -371,7 +377,7 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
     def heartbeat(self, now):
         super().heartbeat(now)
 
-        if self.state in ('ready', 'handshaking') and (now - self.last_data_received) > self.inactivity_timeout:
+        if self.state in (STATE_READY, STATE_HANDSHAKING) and (now - self.last_data_received) > self.inactivity_timeout:
             self.disconnect('No data (not even keepalives) received for {0:.0f} seconds'.format(
                 self.inactivity_timeout))
             self.reconnect()
@@ -499,7 +505,7 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
                 self.udp_transport and str(self.udp_transport) or 'disabled',
                 self.send_split_sync and 'enabled' or 'disabled')
 
-        self.state = 'ready'
+        self.state = STATE_READY
         self.handle_server_line = self.handle_connected_request
         self.coordinator.server_connected()
 

@@ -25,7 +25,8 @@ import time
 
 import _modes
 import mlat.profile
-from mlat.client.util import monotonic_time, log
+from mlat.client.util import (monotonic_time, log,
+                               STATE_CONNECTED, STATE_READY)
 from mlat.client.stats import global_stats
 from mlat.constants import TIMESTAMP_WARNING_INTERVAL
 
@@ -129,6 +130,7 @@ class Coordinator:
                     next_server_send = now + 0.25
 
         finally:
+            log('Client shutting down, disconnecting from all services')
             self.receiver.disconnect('Client shutting down')
             self.server.disconnect('Client shutting down')
             for o in self.outputs:
@@ -248,14 +250,18 @@ class Coordinator:
     # callbacks from server connection
 
     def server_connected(self):
+        log('Server connection established, setting up client')
         self.requested_traffic = set()
         self.requested_modeac = set()
         self.newly_seen = set()
         self.aircraft = {}
         self.reported = set()
         self.next_report = random.random() * self.report_interval
-        if self.receiver.state != 'ready':
+        if self.receiver.state not in (STATE_CONNECTED, STATE_READY):
+            log('Receiver not connected (state: {0}), attempting to connect to receiver', self.receiver.state)
             self.receiver.reconnect()
+        else:
+            log('Receiver already connected (state: {0})', self.receiver.state)
 
     def server_disconnected(self):
         self.receiver.disconnect('Lost connection to multilateration server, no need for input data')

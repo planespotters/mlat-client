@@ -23,7 +23,8 @@ Common networking bits, based on asyncore
 import sys
 import socket
 import asyncore
-from mlat.client.util import log, log_exc, monotonic_time
+from mlat.client.util import (log, log_exc, monotonic_time,
+                               STATE_DISCONNECTED, STATE_CONNECTED, STATE_READY)
 
 import random
 random.seed()
@@ -56,14 +57,14 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
         self.port = port
         # check port as well, if port doesn't match, could be direct MLAT
         self.addrlist = []
-        self.state = 'disconnected'
+        self.state = STATE_DISCONNECTED
         self.reconnect_at = None
         self.last_try = 0
 
     def heartbeat(self, now):
         if self.reconnect_at is None or self.reconnect_at > now:
             return
-        if self.state == 'ready':
+        if self.state == STATE_READY:
             return
         self.reconnect_at = None
         self.reconnect()
@@ -75,11 +76,11 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
             # blarg, try to eat asyncore bugs
             pass
 
-        if self.state != 'disconnected':
+        if self.state != STATE_DISCONNECTED:
             if not manual_close:
                 log('Lost connection to {host}:{port}', host=self.host, port=self.port)
 
-            self.state = 'disconnected'
+            self.state = STATE_DISCONNECTED
             self.reset_connection()
             self.lost_connection()
 
@@ -87,7 +88,7 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
             self.schedule_reconnect()
 
     def disconnect(self, reason):
-        if self.state != 'disconnected':
+        if self.state != STATE_DISCONNECTED:
             log('Disconnecting from {host}:{port}: {reason}', host=self.host, port=self.port, reason=reason)
             self.close(True)
 
@@ -121,7 +122,7 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
         self.address
 
     def reconnect(self):
-        if self.state != 'disconnected':
+        if self.state != STATE_DISCONNECTED:
             self.disconnect('About to reconnect')
 
         self.last_try = monotonic_time()
@@ -150,7 +151,7 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
             self.close()
 
     def handle_connect(self):
-        self.state = 'connected'
+        self.state = STATE_CONNECTED
         self.addrlist = []  # connect was OK, re-resolve next time
         self.start_connection()
 

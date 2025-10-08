@@ -27,7 +27,7 @@ import _modes
 import mlat.profile
 from mlat.client.stats import global_stats
 from mlat.client.net import ReconnectingConnection
-from mlat.client.util import log, monotonic_time
+from mlat.client.util import log, monotonic_time, STATE_CONNECTED
 
 
 class ReceiverConnection(ReconnectingConnection):
@@ -107,7 +107,7 @@ class ReceiverConnection(ReconnectingConnection):
     def start_connection(self):
         log('Input connected to {0}:{1}', self.host, self.port)
         self.last_data_received = monotonic_time()
-        self.state = 'connected'
+        self.state = STATE_CONNECTED
         self.coordinator.input_connected()
 
         # synthesize a mode change immediately if we are not autodetecting
@@ -118,7 +118,7 @@ class ReceiverConnection(ReconnectingConnection):
 
     def send_settings_message(self):
         # if we are connected to something that is Beast-like (or autodetecting), send a beast settings message
-        if self.state != 'connected':
+        if self.state != STATE_CONNECTED:
             return
 
         if self.reader.mode not in (None, _modes.BEAST, _modes.RADARCAPE, _modes.RADARCAPE_EMULATED):
@@ -139,7 +139,7 @@ class ReceiverConnection(ReconnectingConnection):
     def heartbeat(self, now):
         ReconnectingConnection.heartbeat(self, now)
 
-        if self.state == 'connected' and (now - self.last_data_received) > self.inactivity_timeout:
+        if self.state == STATE_CONNECTED and (now - self.last_data_received) > self.inactivity_timeout:
             self.disconnect('No data (not even keepalives) received for {0:.0f} seconds'.format(
                 self.inactivity_timeout))
             self.reconnect()

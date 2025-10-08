@@ -21,8 +21,15 @@ import time
 import traceback
 
 
-__all__ = ('log', 'log_exc', 'monotonic_time')
+__all__ = ('log', 'log_exc', 'monotonic_time',
+           'STATE_DISCONNECTED', 'STATE_CONNECTED', 'STATE_READY', 'STATE_HANDSHAKING')
 
+
+# Connection state constants
+STATE_DISCONNECTED = 'disconnected'
+STATE_CONNECTED = 'connected'
+STATE_READY = 'ready'
+STATE_HANDSHAKING = 'handshaking'
 
 suppress_log_timestamps = True
 

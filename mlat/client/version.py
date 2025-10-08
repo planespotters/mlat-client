@@ -2,6 +2,7 @@
 
 # Part of mlat-client - an ADS-B multilateration client.
 # Copyright 2015, Oliver Jowett <oliver@mutability.co.uk>
+# Copyright 2025, Planespotters.net <support@planespotters.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,4 +19,4 @@
 
 """Just a version constant!"""
 
-CLIENT_VERSION = "0.4.2"
+CLIENT_VERSION = "0.5.0"
