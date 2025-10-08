@@ -50,6 +50,26 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
     """
 
     reconnect_interval = 10.0
+    _ipv6_supported = None  # Cache for IPv6 support detection
+
+    @classmethod
+    def _check_ipv6_support(cls):
+        """Check if IPv6 is supported and routable on this system."""
+        if cls._ipv6_supported is None:
+            try:
+                # Try to create and bind an IPv6 socket to verify IPv6 is actually available
+                test_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+                try:
+                    # Try to bind to IPv6 loopback - this will fail if IPv6 isn't configured
+                    test_socket.bind(('::1', 0))
+                    cls._ipv6_supported = True
+                    log('IPv6 support detected')
+                finally:
+                    test_socket.close()
+            except (OSError, socket.error) as e:
+                cls._ipv6_supported = False
+                log('IPv6 not available, will use IPv4 only')
+        return cls._ipv6_supported
 
     def __init__(self, host, port):
         asyncore.dispatcher.__init__(self)
@@ -60,6 +80,8 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
         self.state = STATE_DISCONNECTED
         self.reconnect_at = None
         self.last_try = 0
+        # Check IPv6 support on first initialization
+        self._check_ipv6_support()
 
     def heartbeat(self, now):
         if self.reconnect_at is None or self.reconnect_at > now:
@@ -140,9 +162,12 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
                                                        proto=0,
                                                        flags=0)
 
-                    # Prioritize IPv4 (AF_INET) over IPv6 (AF_INET6) for systems without IPv6
-                    # Sort so IPv4 addresses come first
-                    self.addrlist.sort(key=lambda x: (x[0] != socket.AF_INET, x))
+                    # Filter out IPv6 addresses if IPv6 is not supported
+                    if not self._ipv6_supported:
+                        self.addrlist = [addr for addr in self.addrlist if addr[0] == socket.AF_INET]
+                    else:
+                        # Prioritize IPv4 over IPv6 for better compatibility
+                        self.addrlist.sort(key=lambda x: (x[0] != socket.AF_INET, x))
 
                 # try the next available address
                 a_family, a_type, a_proto, a_canonname, a_sockaddr = self.addrlist[0]
@@ -154,10 +179,11 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
                 break
 
             except socket.error as e:
-                # EADDRNOTAVAIL means this address family isn't available (e.g. no IPv6)
+                # EADDRNOTAVAIL (99) = address family not available (e.g. no IPv6)
+                # ENETUNREACH (101) = network unreachable (e.g. IPv6 not routed)
                 # Try the next address if available
-                if e.errno == 99 and len(self.addrlist) > 0:
-                    log('Address not available, trying next address')
+                if e.errno in (99, 101) and len(self.addrlist) > 0:
+                    log('Connection failed ({error}), trying next address', error=e.strerror)
                     continue
 
                 # For other errors or if no more addresses, give up and schedule reconnect
