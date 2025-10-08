@@ -54,14 +54,12 @@ def get_optimization_flags():
                 flags.append('-march=native')
             else:
                 flags.append('-march=x86-64')
-                flags.append('-mtune=generic')
         elif arch in ['aarch64', 'arm64']:
             # ARM 64-bit
             if os.environ.get('OPTIMIZE_NATIVE'):
                 flags.append('-march=native')
             else:
                 flags.append('-march=armv8-a')
-                flags.append('-mtune=generic')
         elif arch.startswith('arm'):
             # ARM 32-bit
             if os.environ.get('OPTIMIZE_NATIVE'):
@@ -69,7 +67,6 @@ def get_optimization_flags():
             else:
                 flags.append('-march=armv7-a')
                 flags.append('-mfpu=neon')
-                flags.append('-mtune=generic')
         
         # Enable Link Time Optimization if requested
         if os.environ.get('ENABLE_LTO'):
