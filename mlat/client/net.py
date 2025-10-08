@@ -126,29 +126,40 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
             self.disconnect('About to reconnect')
 
         self.last_try = monotonic_time()
-        try:
-            self.reset_connection()
 
+        while True:
+            try:
+                self.reset_connection()
 
-            if len(self.addrlist) == 0:
-                # ran out of addresses to try, resolve it again
+                if len(self.addrlist) == 0:
+                    # ran out of addresses to try, resolve it again
+                    self.addrlist = socket.getaddrinfo(host=self.host,
+                                                       port=self.port,
+                                                       family=socket.AF_UNSPEC,
+                                                       type=socket.SOCK_STREAM,
+                                                       proto=0,
+                                                       flags=0)
 
-                self.addrlist = socket.getaddrinfo(host=self.host,
-                                                   port=self.port,
-                                                   family=socket.AF_UNSPEC,
-                                                   type=socket.SOCK_STREAM,
-                                                   proto=0,
-                                                   flags=0)
+                # try the next available address
+                a_family, a_type, a_proto, a_canonname, a_sockaddr = self.addrlist[0]
+                del self.addrlist[0]
 
-            # try the next available address
-            a_family, a_type, a_proto, a_canonname, a_sockaddr = self.addrlist[0]
-            del self.addrlist[0]
+                self.create_socket(a_family, a_type)
+                self.connect(a_sockaddr)
+                # Connection attempt started successfully
+                break
 
-            self.create_socket(a_family, a_type)
-            self.connect(a_sockaddr)
-        except socket.error as e:
-            log('Connection to {host}:{port} failed: {ex!s}', host=self.host, port=self.port, ex=e)
-            self.close()
+            except socket.error as e:
+                # EADDRNOTAVAIL means this address family isn't available (e.g. no IPv6)
+                # Try the next address if available
+                if e.errno == 99 and len(self.addrlist) > 0:
+                    log('Address not available, trying next address')
+                    continue
+
+                # For other errors or if no more addresses, give up and schedule reconnect
+                log('Connection to {host}:{port} failed: {ex!s}', host=self.host, port=self.port, ex=e)
+                self.close()
+                break
 
     def handle_connect(self):
         self.state = STATE_CONNECTED
