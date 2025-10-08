@@ -140,6 +140,10 @@ class ReconnectingConnection(LoggingMixin, asyncore.dispatcher):
                                                        proto=0,
                                                        flags=0)
 
+                    # Prioritize IPv4 (AF_INET) over IPv6 (AF_INET6) for systems without IPv6
+                    # Sort so IPv4 addresses come first
+                    self.addrlist.sort(key=lambda x: (x[0] != socket.AF_INET, x))
+
                 # try the next available address
                 a_family, a_type, a_proto, a_canonname, a_sockaddr = self.addrlist[0]
                 del self.addrlist[0]
