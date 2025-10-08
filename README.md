@@ -31,12 +31,8 @@ To run it, invoke:
 
 ## Running
 
-If you are using this with piaware, you don't need to do anything special
-other than to make sure that fa-mlat-client is available on your $PATH.
-piaware will detect the presence of the client and start it when needed.
-
-If you are connecting to a third party multilateration server, contact the
-server's administrator for configuration instructions.
+To connect to a multilateration server, contact the server's administrator
+for configuration instructions.
 
 ## Supported receivers
 

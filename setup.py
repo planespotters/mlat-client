@@ -27,6 +27,7 @@ else:
     from distutils.core import setup, Extension
 
 import platform
+import os
 
 # get the version from the source
 CLIENT_VERSION = "unknown"
@@ -34,12 +35,64 @@ exec(open('mlat/client/version.py').read())
 
 more_warnings = False
 extra_compile_args = []
-if platform.system() == 'Linux':
-    extra_compile_args.append('-O3')
 
-    if more_warnings:
-        # let's assume this is GCC
-        extra_compile_args.append('-Wpointer-arith')
+# Architecture detection and optimization
+def get_optimization_flags():
+    flags = []
+    
+    # Base optimization level
+    if platform.system() == 'Linux':
+        flags.append('-O3')
+        
+        # Get architecture from environment or detect
+        arch = os.environ.get('TARGET_ARCH') or platform.machine()
+        
+        # Architecture-specific optimizations
+        if arch in ['x86_64', 'amd64']:
+            # Intel/AMD 64-bit
+            if os.environ.get('OPTIMIZE_NATIVE'):
+                flags.append('-march=native')
+            else:
+                flags.append('-march=x86-64')
+                flags.append('-mtune=generic')
+        elif arch in ['aarch64', 'arm64']:
+            # ARM 64-bit
+            if os.environ.get('OPTIMIZE_NATIVE'):
+                flags.append('-march=native')
+            else:
+                flags.append('-march=armv8-a')
+                flags.append('-mtune=generic')
+        elif arch.startswith('arm'):
+            # ARM 32-bit
+            if os.environ.get('OPTIMIZE_NATIVE'):
+                flags.append('-march=native')
+            else:
+                flags.append('-march=armv7-a')
+                flags.append('-mfpu=neon')
+                flags.append('-mtune=generic')
+        
+        # Enable Link Time Optimization if requested
+        if os.environ.get('ENABLE_LTO'):
+            flags.append('-flto')
+            
+        # Profile-guided optimization flags
+        if os.environ.get('PGO_GENERATE'):
+            flags.append('-fprofile-generate')
+        elif os.environ.get('PGO_USE'):
+            flags.append('-fprofile-use')
+            flags.append('-fprofile-correction')
+    
+    # Add custom CFLAGS from environment
+    if 'CFLAGS' in os.environ:
+        flags.extend(os.environ['CFLAGS'].split())
+    
+    return flags
+
+extra_compile_args = get_optimization_flags()
+
+if more_warnings:
+    # let's assume this is GCC
+    extra_compile_args.append('-Wpointer-arith')
 
 modes_ext = Extension('_modes',
                       sources=['_modes.c', 'modes_reader.c', 'modes_message.c', 'modes_crc.c'],
@@ -50,6 +103,6 @@ setup(name='MlatClient',
       description='Multilateration client package',
       author='Oliver Jowett',
       author_email='oliver@mutability.co.uk',
-      packages=['mlat', 'mlat.client', 'flightaware', 'flightaware.client'],
+      packages=['mlat', 'mlat.client'],
       ext_modules=[modes_ext],
-      scripts=['mlat-client', 'fa-mlat-client'])
+      scripts=['mlat-client'])
