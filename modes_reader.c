@@ -21,6 +21,18 @@
 #include <Python.h>
 #include <sys/time.h>
 
+/* Python 3.11+ made PyFloat_Unpack4 public, older versions use _PyFloat_Unpack4 */
+#if PY_VERSION_HEX >= 0x030b0000
+    /* Python 3.11+: Use public API (takes const char *) */
+    #define FLOAT_UNPACK4 PyFloat_Unpack4
+    #define FLOAT_CAST(x) ((const char *)(x))
+#else
+    /* Python 3.9-3.10: Use internal API (takes const unsigned char *) */
+    extern double _PyFloat_Unpack4(const unsigned char *p, int le);
+    #define FLOAT_UNPACK4 _PyFloat_Unpack4
+    #define FLOAT_CAST(x) ((const unsigned char *)(x))
+#endif
+
 static unsigned long long monotic_ms(void) {
     struct timespec ts;
     unsigned long long mst;
@@ -533,15 +545,15 @@ static PyObject *radarcape_position_to_dict(uint8_t *data)
 {
     float lat, lon, alt;
 
-    lat = PyFloat_Unpack4(data + 4, 1);
+    lat = FLOAT_UNPACK4(FLOAT_CAST(data + 4), 1);
     if (lat == -1.0 && PyErr_Occurred())
         return NULL;
 
-    lon = PyFloat_Unpack4(data + 8, 1);
+    lon = FLOAT_UNPACK4(FLOAT_CAST(data + 8), 1);
     if (lon == -1.0 && PyErr_Occurred())
         return NULL;
 
-    alt = PyFloat_Unpack4(data + 12, 1);
+    alt = FLOAT_UNPACK4(FLOAT_CAST(data + 12), 1);
     if (alt == -1.0 && PyErr_Occurred())
         return NULL;
 
