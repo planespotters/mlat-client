@@ -18,7 +18,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-import socket
 
 import mlat.client.version
 import time
@@ -28,36 +27,6 @@ from mlat.client.receiver import ReceiverConnection
 from mlat.client.jsonclient import JsonServerConnection
 from mlat.client.coordinator import Coordinator
 from mlat.client import options
-
-
-def check_receiver_availability(host, port, max_attempts=3, retry_delay=2):
-    """Check if the receiver is available before starting the client.
-
-    Returns True if receiver is reachable, False otherwise.
-    """
-    util.log('Checking receiver availability at {host}:{port}', host=host, port=port)
-
-    for attempt in range(1, max_attempts + 1):
-        try:
-            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            test_socket.settimeout(3)
-            test_socket.connect((host, port))
-            test_socket.close()
-            util.log('Receiver is available')
-            return True
-        except (socket.error, socket.timeout) as e:
-            if attempt < max_attempts:
-                util.log('Receiver not available (attempt {attempt}/{max_attempts}), retrying in {delay} seconds...',
-                        attempt=attempt, max_attempts=max_attempts, delay=retry_delay)
-                time.sleep(retry_delay)
-            else:
-                util.log('WARNING: Receiver at {host}:{port} is not available after {attempts} attempts',
-                        host=host, port=port, attempts=max_attempts)
-                util.log('WARNING: Please ensure your receiver (dump1090/readsb/etc.) is running and accessible')
-                util.log('WARNING: The client will continue, but may not function properly until receiver is available')
-                return False
-
-    return False
 
 
 def main():
@@ -145,13 +114,6 @@ location pin from the coverage maps.""",
 
     coordinator = Coordinator(receiver=receiver, server=server, outputs=outputs, freq=options.clock_frequency(args),
                               allow_anon=args.allow_anon_results, allow_modeac=args.allow_modeac_results)
-
-    # Check receiver availability before starting
-    check_receiver_availability(args.input_connect[0], args.input_connect[1])
-
-    # Start receiver connection first to give it time to establish before server handshake
-    util.log('Connecting to receiver at {host}:{port}', host=args.input_connect[0], port=args.input_connect[1])
-    receiver.reconnect()
 
     # Start server connection
     server.start()

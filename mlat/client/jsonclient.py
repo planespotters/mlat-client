@@ -384,6 +384,7 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
                          'return_stats': True,
                          'uuid': uuid}
         handshake_msg.update(self.handshake_data)
+        log("Sending handshake to server")
         if DEBUG:
             log("Handshake: {0}", handshake_msg)
         self.writebuf += (json.dumps(handshake_msg, sort_keys=True) + 16 * '        ' + '\n').encode('ascii')   # linebuf not used yet
@@ -478,6 +479,8 @@ class JsonServerConnection(mlat.client.net.ReconnectingConnection):
         del self.readbuf[:i]
 
     def handle_handshake_response(self, response):
+        log('Received handshake response from server')
+
         if 'reconnect_in' in response:
             self.reconnect_interval = response['reconnect_in']
 
